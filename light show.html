@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Concert Sync</title>
+    <style>
+        body {
+            background-color: #000;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.1s ease;
+        }
+        #status { font-size: 1.2rem; margin-bottom: 20px; text-align: center; }
+        button {
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:active { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Ready for the show?</div>
+    <button id="startBtn">JOIN THE SHOW</button>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const statusText = document.getElementById('status');
+        
+        // Configuration: Change this frequency to match your FL Studio signal
+        const TARGET_FREQ = 18500; 
+        const TOLERANCE = 200; // Sensitivity to the frequency volume
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                // Initialize Audio Context after user click
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                startBtn.style.display = 'none';
+                statusText.innerText = "Listening for the beat...";
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                // Math to find the right "bucket" (bin) in the audio data
+                const sampleRate = audioCtx.sampleRate;
+                const binIndex = Math.round((TARGET_FREQ * analyser.fftSize) / sampleRate);
+
+                function detect() {
+                    analyser.getByteFrequencyData(dataArray);
+                    const volume = dataArray[binIndex];
+
+                    // If volume at target frequency is high, flash!
+                    if (volume > 150) { 
+                        document.body.style.backgroundColor = "white";
+                    } else {
+                        document.body.style.backgroundColor = "black";
+                    }
+                    requestAnimationFrame(detect);
+                }
+
+                detect();
+            } catch (err) {
+                statusText.innerText = "Error: Please allow microphone access.";
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+</html>
